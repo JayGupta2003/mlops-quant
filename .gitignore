@@ -1,0 +1,24 @@
+# --- Python Basics ---
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+
+# --- Data Science & MLOps (IMPORTANT) ---
+# Never commit datasets
+data/
+
+# Never commit trained models (they are binary blobs, use DVC or releases instead)
+models/
+
+# Ignore MLflow local logs
+mlruns/
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# --- IDE & System ---
+.vscode/
+.idea/
+.DS_Store

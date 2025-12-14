@@ -1,0 +1,29 @@
+name: MLOps Quant Pipeline
+
+on:
+  push:
+    branches: ["main", "master"]
+  pull_request:
+    branches: ["main", "master"]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Python 3.11.14
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.11.14"
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Train Model
+        run: python src/train.py
+
+      - name: Run Tests
+        run: python -m pytest
