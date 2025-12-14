@@ -6,3 +6,4 @@ joblib
 mlflow
 fastapi
 uvicorn
+yfinance
