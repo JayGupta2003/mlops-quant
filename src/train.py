@@ -1,48 +1,54 @@
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.metrics import accuracy_score, precision_score
 import mlflow
 import mlflow.sklearn
 import joblib
 import os
 
-EXPERIMENT_NAME = "AAPL_Trading_Signal"
+from src.data_loader import load_stock_data
+from ta.momentum import RSIIndicator
+from ta.trend import EMAIndicator
+from ta.volatility import BollingerBands
 
-def feature_engineering(df):
-    """
-    Creates Technical indicators.
-    """
+EXPERIMENT_NAME = "Quant API Experiment"
+
+def add_technical_indicators(df):
     df = df.copy()
+    
+    # 1. RSI (Momentum) - Classic Overbought/Oversold
+    rsi_indicator = RSIIndicator(close=df["Close"], window=14)
+    df["RSI"] = rsi_indicator.rsi()
 
-    # 1. Daily Return (Today's Close / Yesterday's Close - 1)
-    df["Return"] = df["Close"].pct_change()
+    # 2. EMA Crossover (Trend)
+    ema_short = EMAIndicator(close=df["Close"], window=12)
+    ema_long = EMAIndicator(close=df["Close"], window=26)
+    df["EMA_Diff"] = ema_short.ema_indicator() - ema_long.ema_indicator()
 
-    # 2. Volatility (5-day rolling standard deviation of returns)
-    df["Volatility"] = df["Return"].rolling(window=5).std()
-
-    # 3. Moving Average (10-day) relative to price
-    df["MA_10"] = df["Close"].rolling(window=10).mean()
-    df["Dist_MA10"] = df["Close"] / df["MA_10"] - 1
-
-    # Target: 1 if Next Day's Close > Today's Close, else 0
-    df["Target"] = (df["Close"].shift(-1) > df["Close"]).astype(int)
+    # 3. Bollinger Bands (Volatility)
+    bb = BollingerBands(close=df["Close"], window=20, window_dev=2)
+    df["BB_Width"] = (bb.bollinger_hband() - bb.bollinger_lband()) / df["Close"]
+    
     df.dropna(inplace=True)
     return df
 
 def train_model():
     mlflow.set_experiment(EXPERIMENT_NAME)
 
-    # Load Data
-    data_path = os.path.join("data", "raw", "aapl_data.csv")
-    df = pd.read_csv(data_path)
-    df_processed = feature_engineering(df)
+    # Fetch Data (We train on SPY as a general market proxy)
+    print("Fetching SPY data for training...")
+    df = load_stock_data("SPY", "2015-01-01", None)
 
-    # Define features (X) and target (y)
-    features = ['Return', 'Volatility', 'Dist_MA10']
-    X = df_processed[features]
-    y = df_processed['Target']
+    df = add_technical_indicators(df)
 
-    split_point = int(len(df_processed) * 0.8)
+    # Target: 1 if Next Day Return > 0.0 (Positive day)
+    df["Target"] = (df["Close"].shift(-1) > df["Close"]).astype(int)
+
+    features = ["RSI", "EMA_Diff", "BB_Width"]
+    X = df[features]
+    y = df["Target"]
+
+    split_point = int(len(X) * 0.8)
     X_train, X_test = X.iloc[:split_point], X.iloc[split_point:]
     y_train, y_test = y.iloc[:split_point], y.iloc[split_point:]
 
@@ -53,23 +59,30 @@ def train_model():
         # Hyperparameters
         n_estimators = 200
         min_samples = 10
+        max_depth = 10
 
         # Log them
         mlflow.log_param("n_estimators", n_estimators)
         mlflow.log_param("min_samples_split", min_samples)
+        mlflow.log_param("max_depth", max_depth)
         mlflow.log_param("features", features)
 
         print(f"Training with n_estimators={n_estimators}...")
         clf = RandomForestClassifier(n_estimators=n_estimators, 
-                                     min_samples_split=min_samples, 
+                                     min_samples_split=min_samples,
+                                     max_depth=max_depth, 
                                      random_state=42)
         clf.fit(X_train, y_train)
         y_pred = clf.predict(X_test)
         accuracy = accuracy_score(y_test, y_pred)
+        precision = precision_score(y_test, y_pred)
         print(f"Model Accuracy: {accuracy:.2f}")
-        mlflow.log_metric("accuracy", accuracy)
+        print(f"Model Precision: {precision:.2f}")
 
+        mlflow.log_metric("accuracy", accuracy)
+        mlflow.log_metric("precision", precision)
         mlflow.sklearn.log_model(clf, "random_forest_model")
+
         print("Model and metrics logged to MLflow.")
 
         os.makedirs("models", exist_ok=True)

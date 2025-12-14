@@ -2,29 +2,40 @@ import pandas as pd
 import yfinance as yf
 import os
 
-def load_stock_data(ticker, start_date, end_date, save_path):
+def load_stock_data(ticker, start_date, end_date):
     """
-    Downloads historical stock data from Yahoo Finance and saves it.
+    Centralized logic to download and clean stock data.
+    Returns a DataFrame.
     """
     print(f"Downloading data for {ticker} ({start_date} to {end_date})...")
     
-    df = yf.download(ticker, start=start_date, end=end_date)
+    df = yf.download(ticker, start=start_date, end=end_date, progress=False)
     
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
     
     df.reset_index(inplace=True)
-    os.makedirs(os.path.dirname(save_path), exist_ok=True)
 
+    if len(df) == 0:
+        raise ValueError(f"No Data found for {ticker}")
+    
+    return df
+
+def save_data_to_csv(df, save_path):
+    """
+    Helper to save the dataframe to disk.
+    """
+
+    os.makedirs(os.path.dirname(save_path), exist_ok=True)
     df.to_csv(save_path, index=False)
     print(f"Data saved to {save_path}")
-    print(f"Rows: {len(df)}")
     return df
 
 if __name__ == "__main__":
-    TICKER = "AAPL"
-    START = "2018-01-01"
+    TICKER = "SPY"
+    START = "2015-01-01"
     END = None
-    SAVE_PATH = os.path.join("data", "raw", "aapl_data.csv")
+    SAVE_PATH = os.path.join("data", "raw", "spy_data.csv")
     
-    load_stock_data(TICKER, START, END, SAVE_PATH)
+    df = load_stock_data(TICKER, START, END)
+    save_data_to_csv(df, SAVE_PATH)
