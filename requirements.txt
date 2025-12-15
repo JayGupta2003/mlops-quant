@@ -9,3 +9,6 @@ uvicorn
 yfinance
 httpx
 ta
+streamlit
+plotly
+requests

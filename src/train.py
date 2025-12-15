@@ -27,7 +27,9 @@ def add_technical_indicators(df):
 
     # 3. Bollinger Bands (Volatility)
     bb = BollingerBands(close=df["Close"], window=20, window_dev=2)
-    df["BB_Width"] = (bb.bollinger_hband() - bb.bollinger_lband()) / df["Close"]
+    df["BB_Upper"] = bb.bollinger_hband()
+    df["BB_Lower"] = bb.bollinger_lband()
+    df["BB_Width"] = (df["BB_Upper"] - df["BB_Lower"]) / df["Close"]
     
     df.dropna(inplace=True)
     return df
