@@ -13,14 +13,22 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
-from src.train import add_technical_indicators
+from src.train import add_technical_indicators, train_model
 from src.data_loader import load_stock_data
 
 st.set_page_config(page_title="Quant Pipeline", layout="wide")
 
 @st.cache_resource
 def load_model():
-    return joblib.load("models/model.joblib")
+    model_path = "models/model.joblib"
+
+    if not os.path.exists(model_path):
+        st.warning("Model not found! Training a new one... (This may take a minute)")
+        os.makedirs("models", exist_ok=True)
+        train_model()
+        st.success("Training Complete!")
+    
+    return joblib.load(model_path)
 
 model = load_model()
 
